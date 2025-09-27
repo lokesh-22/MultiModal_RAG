@@ -143,18 +143,14 @@ cython_debug/
 *.code-workspace
 
 # Project-specific ignores
-# Data directories (exclude raw data files)
-data/audio/*
-data/images/*
-data/pdfs/*
-!data/audio/.gitkeep
-!data/images/.gitkeep
-!data/pdfs/.gitkeep
-
-# Processed data and outputs
-processed/
+# Processed data and outputs (keep raw data, exclude processed outputs)
 temp/
-vectorstore/
+
+# Vector store data (keep folder structure, exclude data files)
+vectorstore/*.faiss
+vectorstore/*.json
+vectorstore/faiss_index/*.faiss
+vectorstore/faiss_index/*.json
 
 # Large files and models
 *.bin
