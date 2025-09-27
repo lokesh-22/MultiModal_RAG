@@ -143,7 +143,19 @@ cython_debug/
 *.code-workspace
 
 # Project-specific ignores
-# Processed data and outputs (keep raw data, exclude processed outputs)
+# Data directories (keep folder structure, exclude actual data files)
+data/audio/*
+data/images/*
+data/pdfs/*
+!data/audio/.gitkeep
+!data/images/.gitkeep
+!data/pdfs/.gitkeep
+
+# Processed data (keep folder structure, exclude processed files)
+processed/*
+!processed/.gitkeep
+
+# Temporary files
 temp/
 
 # Vector store data (keep folder structure, exclude data files)
