@@ -4,7 +4,7 @@ import faiss
 from config import VECTOR_DIR
 
 # Load embedding model
-EMBEDDING_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+EMBEDDING_MODEL = SentenceTransformer("local_models/all-MiniLM-L6-v2")
 
 # Load FAISS index
 index = faiss.read_index(f"{VECTOR_DIR}/index.faiss")

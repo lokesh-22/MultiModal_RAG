@@ -170,6 +170,9 @@ vectorstore/faiss_index/*.json
 *.pkl
 *.pickle
 
+# Local ML models directory (sentence-transformers, etc.)
+local_models/
+
 # API keys and sensitive configuration
 config_local.py
 .env.local

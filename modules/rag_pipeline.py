@@ -25,6 +25,8 @@ def chunk_text_with_overlap(text, chunk_size=300, overlap=50):
 def process_inputs():
     # PDFs
     for pdf in os.listdir(PDF_DIR):
+        if not pdf.lower().endswith(".pdf"):
+            continue
         pdf_path = os.path.join(PDF_DIR, pdf)
         results = process_pdf(pdf_path)
         save_processed(results, f"{os.path.splitext(pdf)[0]}_processed.json")
@@ -35,6 +37,8 @@ def process_inputs():
 
     # Images
     for img in os.listdir(IMAGE_DIR):
+        if not img.lower().endswith((".png", ".jpg", ".jpeg")):
+            continue
         img_path = os.path.join(IMAGE_DIR, img)
         caption = describe_image(img_path)
         save_processed({"file": img, "text": caption}, f"{os.path.splitext(img)[0]}_processed.json")
@@ -44,6 +48,8 @@ def process_inputs():
 
     # Audio
     for audio in os.listdir(AUDIO_DIR):
+        if not audio.lower().endswith((".mp3", ".wav", ".m4a")):
+            continue
         audio_path = os.path.join(AUDIO_DIR, audio)
         transcript = transcribe_audio(audio_path)
         save_processed({"file": audio, "text": transcript}, f"{os.path.splitext(audio)[0]}_processed.json")

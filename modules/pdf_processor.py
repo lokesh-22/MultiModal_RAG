@@ -1,4 +1,5 @@
-import fitz
+import fitz  # this comes from PyMuPDF
+
 from PIL import Image
 import os
 import ollama

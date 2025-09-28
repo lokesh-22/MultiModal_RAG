@@ -7,7 +7,7 @@ from config import VECTOR_DIR
 
 os.makedirs(VECTOR_DIR, exist_ok=True)
 
-EMBEDDING_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+EMBEDDING_MODEL = SentenceTransformer("local_models/all-MiniLM-L6-v2")
 METADATA_FILE = os.path.join(VECTOR_DIR, "metadata.json")
 INDEX_FILE = os.path.join(VECTOR_DIR, "index.faiss")
 
