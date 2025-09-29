@@ -1,19 +1,32 @@
-import faiss
-import json
-from sentence_transformers import SentenceTransformer
 import ollama
-from config import VECTOR_DIR
+from modules.models import (
+    get_embedding_model,
+    load_faiss_index,
+    load_metadata_store,
+)
+import os
+from dotenv import load_dotenv 
 
-# Load embeddings + FAISS index
-EMBEDDING_MODEL = SentenceTransformer("local_models/all-MiniLM-L6-v2")
-index = faiss.read_index(f"{VECTOR_DIR}/index.faiss")
-with open(f"{VECTOR_DIR}/metadata.json", "r", encoding="utf-8") as f:
-    metadata_store = json.load(f)
+load_dotenv()
+
+# Centralized loaders
+EMBEDDING_MODEL = get_embedding_model()
+index = load_faiss_index(create_if_missing=True)
+metadata_store = load_metadata_store()
 
 def retrieve_chunks(query, top_k=3):
     """
     Retrieve top_k chunks from FAISS based on query embedding.
     """
+    # Guard when index is empty or metadata missing
+    try:
+        ntotal = getattr(index, 'ntotal', 0)
+    except Exception:
+        ntotal = 0
+
+    if ntotal == 0 or not metadata_store:
+        return []
+
     q_emb = EMBEDDING_MODEL.encode([query])
     D, I = index.search(q_emb, top_k)
     results = []
@@ -29,6 +42,18 @@ def retrieve_answer(query, top_k=3):
     LLM-driven RAG: Ask Qwen3 what information it needs,
     then retrieve relevant chunks, and answer with citations.
     """
+    # If no documents are indexed, short-circuit with a helpful message
+    try:
+        if getattr(index, 'ntotal', 0) == 0 or not metadata_store:
+            return (
+                "No documents are indexed yet. Please upload a PDF/Image/Audio via /upload "
+                "before asking questions."
+            )
+    except Exception:
+        return (
+            "Vector index unavailable. Please upload a PDF/Image/Audio via /upload to initialize the index."
+        )
+
     # Step 1: Ask Qwen what context it needs (optional, can guide retrieval)
     instruction = (
         "You are an assistant with access to a vector store of documents.\n"
@@ -38,7 +63,7 @@ def retrieve_answer(query, top_k=3):
     )
     
     retrieval_hint = ollama.chat(
-        model="qwen3:8b",
+        model=os.getenv("OLLAMA_VL_MODEL", "qwen3:8b"),
         messages=[
             {"role": "system", "content": "You are a helpful expert assistant."},
             {"role": "user", "content": instruction}
@@ -60,7 +85,7 @@ def retrieve_answer(query, top_k=3):
     )
 
     response = ollama.chat(
-        model="qwen3:8b",
+        model=os.getenv("OLLAMA_VL_MODEL", "qwen3:8b"),
         messages=[
             {"role": "system", "content": "You are a helpful expert assistant."},
             {"role": "user", "content": final_prompt}
@@ -72,5 +97,5 @@ def retrieve_answer(query, top_k=3):
 # Example usage
 if __name__ == "__main__":
     user_query = "What are the key points about caching in web applications?"
-    answer = rag_answer(user_query, top_k=3)
+    answer = retrieve_answer(user_query, top_k=3)
     print("Answer with citations:\n", answer)

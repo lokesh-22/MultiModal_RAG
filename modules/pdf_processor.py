@@ -17,7 +17,7 @@ def extract_page_with_vllm(page, page_number):
         "If a region contains a non-text image, describe it in detail."
     )
     response = ollama.chat(
-        model="qwen2.5vl:7b",
+        model=os.getenv("OLLAMA_VL_MODEL", "gemma3:4b"),
         messages=[
             {"role": "system", "content": "You are a document OCR and image description assistant."},
             {"role": "user", "content": prompt, "images": [temp_path]}
