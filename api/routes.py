@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form
 from modules.rag_pipeline import process_inputs
@@ -9,6 +10,13 @@ from modules.image_processor import describe_image
 from modules.audio_processor import transcribe_audio
 from modules.retriever import retrieve_answer
 from modules.utils import chunk_text_with_overlap
+from config import BASE_DIR, VECTOR_DIR, PROCESSED_DIR
+from modules.models import get_embedding_dimension
+
+try:
+    import faiss  # type: ignore
+except Exception:
+    faiss = None  # type: ignore
 
 router = APIRouter()
 
@@ -91,7 +99,86 @@ async def ask_question(query: str = Form(...), file: UploadFile | None = File(No
             )
 
     answer = retrieve_answer(augmented_query)
-    return {"answer": answer}
+    # answer is a dict {"answer": str, "citations": [...]}
+    return answer
+
+
+@router.delete("/reset/")
+async def reset_all():
+    """
+    Danger: Clear all data.
+    - Deletes uploads (data/uploads)
+    - Deletes vectorstore files (index.faiss, metadata.json)
+    - Deletes processed outputs (processed/ and data/processed)
+    - Resets in-memory index/metadata and writes fresh empty files
+    """
+    uploads_dir = os.path.join(BASE_DIR, "data", "uploads")
+    data_processed_dir = os.path.join(BASE_DIR, "data", "processed")
+    temp_dir = os.path.join(BASE_DIR, "temp")
+
+    deleted = {"files": 0, "dirs": 0}
+
+    def rm_tree(path: str):
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+            deleted["dirs"] += 1
+
+    def rm_file(path: str):
+        if os.path.isfile(path):
+            try:
+                os.remove(path)
+                deleted["files"] += 1
+            except Exception:
+                pass
+
+    # 1) Clear uploads
+    if os.path.isdir(uploads_dir):
+        shutil.rmtree(uploads_dir, ignore_errors=True)
+        os.makedirs(uploads_dir, exist_ok=True)
+
+    # 2) Clear vectorstore (index + metadata, including nested dirs)
+    if os.path.isdir(VECTOR_DIR):
+        shutil.rmtree(VECTOR_DIR, ignore_errors=True)
+    os.makedirs(VECTOR_DIR, exist_ok=True)
+
+    # 3) Clear processed outputs
+    if os.path.isdir(PROCESSED_DIR):
+        shutil.rmtree(PROCESSED_DIR, ignore_errors=True)
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
+
+    if os.path.isdir(data_processed_dir):
+        shutil.rmtree(data_processed_dir, ignore_errors=True)
+    os.makedirs(data_processed_dir, exist_ok=True)
+
+    # 4) Clear temp folder used by PDF processing (if present)
+    if os.path.isdir(temp_dir):
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+    # 5) Reset in-memory embedding store and write fresh empty index/metadata
+    try:
+        from modules import embedding_store as es
+        dim = get_embedding_dimension()
+        if faiss is not None:
+            es.index = faiss.IndexFlatL2(dim)
+        else:
+            es.index = None  # type: ignore
+        es.metadata_store = {}
+        # Write fresh empty index/metadata to prevent future read errors
+        if faiss is not None and es.index is not None:
+            faiss.write_index(es.index, os.path.join(VECTOR_DIR, "index.faiss"))
+        with open(os.path.join(VECTOR_DIR, "metadata.json"), "w", encoding="utf-8") as f:
+            json.dump({}, f)
+    except Exception as e:
+        # Non-fatal; continue
+        pass
+
+    return {
+        "message": "All data cleared: uploads, vectorstore, processed outputs.",
+        "uploads_dir": uploads_dir,
+        "vectorstore_dir": VECTOR_DIR,
+        "processed_dirs": [PROCESSED_DIR, data_processed_dir],
+        "deleted_counts": deleted,
+    }
 
 
 @router.get("/documents/")

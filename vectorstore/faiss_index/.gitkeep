@@ -1,2 +1,0 @@
-# This file ensures the faiss_index directory is tracked by Git
-# FAISS index files will be generated here when the application runs
