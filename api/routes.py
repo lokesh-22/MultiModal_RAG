@@ -2,7 +2,8 @@ import os
 import json
 import shutil
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi.responses import FileResponse
 from modules.rag_pipeline import process_inputs
 from modules.embedding_store import add_to_index, save_index, METADATA_FILE
 from modules.pdf_processor import process_pdf
@@ -101,6 +102,28 @@ async def ask_question(query: str = Form(...), file: UploadFile | None = File(No
     answer = retrieve_answer(augmented_query)
     # answer is a dict {"answer": str, "citations": [...]}
     return answer
+
+
+@router.get("/uploads/{filename}")
+async def get_uploaded_file(filename: str):
+    """
+    Return a file from the uploads folder by filename.
+    Safely resolves the path to prevent directory traversal.
+    """
+    uploads_dir = os.path.join(BASE_DIR, "data", "uploads")
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(uploads_dir, safe_name)
+
+    real_uploads = os.path.realpath(uploads_dir)
+    real_file = os.path.realpath(file_path)
+
+    # Prevent path traversal and ensure file exists
+    if not real_file.startswith(real_uploads) or not os.path.isfile(real_file):
+        # Keep consistency with other routes that return JSON errors
+        # You can switch to: raise HTTPException(status_code=404, detail=...) if preferred
+        return {"error": f"File '{filename}' not found"}
+
+    return FileResponse(real_file, filename=safe_name)
 
 
 @router.delete("/reset/")
