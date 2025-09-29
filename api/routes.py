@@ -51,11 +51,46 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @router.post("/ask/")
-async def ask_question(query: str = Form(...)):
+async def ask_question(query: str = Form(...), file: UploadFile | None = File(None)):
     """
-    Ask a question → retrieve answer from FAISS + Ollama (Qwen3).
+    Ask a question. If a PDF/Image/Audio file is attached, first extract its
+    content (like in /upload but without indexing) and append to the query.
+    Then retrieve the answer from FAISS + LLM.
     """
-    answer = retrieve_answer(query)
+    augmented_query = query
+
+    # If a file is provided, extract its content and append to the query
+    if file is not None:
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        os.makedirs("data/uploads", exist_ok=True)
+        # Use a unique filename to avoid collisions
+        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+        save_path = f"data/uploads/ask_{timestamp}_{file.filename}"
+
+        with open(save_path, "wb") as f:
+            f.write(await file.read())
+
+        extracted_text = None
+
+        if file_ext == ".pdf":
+            results = process_pdf(save_path)  # list of {"page": int, "text": str}
+            extracted_text = "\n\n".join(r["text"] for r in results if r.get("text"))
+
+        elif file_ext in [".png", ".jpg", ".jpeg"]:
+            extracted_text = describe_image(save_path)
+
+        elif file_ext in [".mp3", ".wav", ".m4a"]:
+            extracted_text = transcribe_audio(save_path)
+
+        else:
+            return {"error": "Unsupported file type"}
+
+        if extracted_text and extracted_text.strip():
+            augmented_query = (
+                f"{query}\n\nAdditional context from attached file ({file.filename}):\n{extracted_text}"
+            )
+
+    answer = retrieve_answer(augmented_query)
     return {"answer": answer}
 
 
