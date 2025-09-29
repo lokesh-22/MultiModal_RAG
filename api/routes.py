@@ -278,64 +278,21 @@ async def get_all_documents():
 
 
 @router.get("/documents/{filename}")
-async def get_document_details(filename: str):
+async def get_document_file(filename: str):
     """
-    Get detailed information about a specific document including all its chunks.
+    Serve the original uploaded file by filename from data/uploads.
+    This replaces the previous details view to directly provide the file
+    so the frontend citation filename click can download/display it.
     """
-    try:
-        # Check if metadata file exists
-        if not os.path.exists(METADATA_FILE):
-            return {"error": "No documents found"}
-        
-        # Load metadata
-        with open(METADATA_FILE, "r", encoding="utf-8") as f:
-            metadata_store = json.load(f)
-        
-        # Find all chunks for this document
-        document_chunks = []
-        document_info = None
-        
-        for chunk_id, metadata in metadata_store.items():
-            if metadata["source_file"] == filename:
-                document_chunks.append({
-                    "chunk_id": chunk_id,
-                    "page_num": metadata.get("page_num"),
-                    "modality": metadata["modality"],
-                    "text_excerpt": metadata["text_excerpt"][:200] + "..." if len(metadata["text_excerpt"]) > 200 else metadata["text_excerpt"]
-                })
-                
-                # Set document info from first chunk
-                if document_info is None:
-                    file_path = f"data/uploads/{filename}"
-                    file_size = None
-                    upload_date = None
-                    
-                    if os.path.exists(file_path):
-                        file_stats = os.stat(file_path)
-                        file_size = file_stats.st_size
-                        upload_date = datetime.fromtimestamp(file_stats.st_ctime).isoformat()
-                    
-                    document_info = {
-                        "filename": filename,
-                        "modality": metadata["modality"],
-                        "file_size": file_size,
-                        "upload_date": upload_date,
-                        "chunk_count": 0
-                    }
-        
-        if not document_chunks:
-            return {"error": f"Document '{filename}' not found"}
-        
-        # Sort chunks by page number for PDFs
-        if document_chunks[0]["modality"] == "text":
-            document_chunks.sort(key=lambda x: x["page_num"] or 0)
-        
-        document_info["chunk_count"] = len(document_chunks)
-        
-        return {
-            "document_info": document_info,
-            "chunks": document_chunks
-        }
-        
-    except Exception as e:
-        return {"error": f"Failed to retrieve document details: {str(e)}"}
+    uploads_dir = os.path.join(BASE_DIR, "data", "uploads")
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(uploads_dir, safe_name)
+
+    real_uploads = os.path.realpath(uploads_dir)
+    real_file = os.path.realpath(file_path)
+
+    if not real_file.startswith(real_uploads) or not os.path.isfile(real_file):
+        raise HTTPException(status_code=404, detail=f"File '{filename}' not found")
+
+    headers = {"X-Source-Path": os.path.relpath(real_file, BASE_DIR)}
+    return FileResponse(real_file, filename=safe_name, headers=headers)
