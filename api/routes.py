@@ -280,11 +280,6 @@ async def get_all_documents():
 
 @router.get("/documents/{filename}")
 async def get_document_file(filename: str):
-    """
-    Serve the original uploaded file by filename from data/uploads.
-    This replaces the previous details view to directly provide the file
-    so the frontend citation filename click can download/display it.
-    """
     uploads_dir = os.path.join(BASE_DIR, "data", "uploads")
     safe_name = os.path.basename(filename)
     file_path = os.path.join(uploads_dir, safe_name)
