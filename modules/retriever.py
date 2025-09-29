@@ -8,6 +8,10 @@ import os
 from dotenv import load_dotenv 
 
 load_dotenv()
+import os
+from dotenv import load_dotenv 
+
+load_dotenv()
 
 # Centralized loaders
 EMBEDDING_MODEL = get_embedding_model()
@@ -45,14 +49,20 @@ def retrieve_answer(query, top_k=3):
     # If no documents are indexed, short-circuit with a helpful message
     try:
         if getattr(index, 'ntotal', 0) == 0 or not metadata_store:
-            return (
-                "No documents are indexed yet. Please upload a PDF/Image/Audio via /upload "
-                "before asking questions."
-            )
+            return {
+                "answer": (
+                    "No documents are indexed yet. Please upload a PDF/Image/Audio via /upload "
+                    "before asking questions."
+                ),
+                "citations": []
+            }
     except Exception:
-        return (
-            "Vector index unavailable. Please upload a PDF/Image/Audio via /upload to initialize the index."
-        )
+        return {
+            "answer": (
+                "Vector index unavailable. Please upload a PDF/Image/Audio via /upload to initialize the index."
+            ),
+            "citations": []
+        }
 
     # Step 1: Ask Qwen what context it needs (optional, can guide retrieval)
     instruction = (
@@ -75,8 +85,14 @@ def retrieve_answer(query, top_k=3):
 
     # Step 3: Combine retrieved chunks with metadata for citations
     context_text = ""
+    citations = []
     for chunk, meta in chunks:
         context_text += f"[Source: {meta['source_file']}, page: {meta.get('page_num', 'N/A')}]\n{chunk}\n\n"
+        citations.append({
+            "text": chunk,
+            "source_file": meta.get("source_file"),
+            "page_num": meta.get("page_num")
+        })
 
     # Step 4: Final answer using context + user question
     final_prompt = (
@@ -92,7 +108,10 @@ def retrieve_answer(query, top_k=3):
         ]
     )
 
-    return response["message"]["content"]
+    return {
+        "answer": response["message"]["content"],
+        "citations": citations
+    }
 
 # Example usage
 if __name__ == "__main__":
