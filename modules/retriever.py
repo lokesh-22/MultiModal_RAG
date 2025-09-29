@@ -8,10 +8,6 @@ import os
 from dotenv import load_dotenv 
 
 load_dotenv()
-import os
-from dotenv import load_dotenv 
-
-load_dotenv()
 
 # Centralized loaders
 EMBEDDING_MODEL = get_embedding_model()
