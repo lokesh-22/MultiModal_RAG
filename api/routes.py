@@ -1,6 +1,7 @@
 import os
 import json
 import shutil
+import mimetypes
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
@@ -294,5 +295,13 @@ async def get_document_file(filename: str):
     if not real_file.startswith(real_uploads) or not os.path.isfile(real_file):
         raise HTTPException(status_code=404, detail=f"File '{filename}' not found")
 
-    headers = {"X-Source-Path": os.path.relpath(real_file, BASE_DIR)}
-    return FileResponse(real_file, filename=safe_name, headers=headers)
+    # Guess MIME type to help the browser render inline (pdf/image/audio)
+    media_type = mimetypes.guess_type(real_file)[0] or "application/octet-stream"
+
+    # Force inline display instead of download
+    headers = {
+        "X-Source-Path": os.path.relpath(real_file, BASE_DIR),
+        "Content-Disposition": f'inline; filename="{safe_name}"'
+    }
+    # Do not pass filename= to avoid automatic 'attachment' disposition
+    return FileResponse(real_file, media_type=media_type, headers=headers)
